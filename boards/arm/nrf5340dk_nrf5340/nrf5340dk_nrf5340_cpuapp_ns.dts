@@ -23,3 +23,13 @@ zephyr_udc0: &usbd {
 	compatible = "nordic,nrf-usbd";
 	status = "okay";
 };
+
+/ {
+	nrf_radio_coex: radio_coex_three_wire {
+		status = "okay";
+		compatible = "generic-radio-coex-three-wire";
+		req-gpios =     <&gpio0 5 (GPIO_ACTIVE_HIGH)>;
+		pri-dir-gpios = <&gpio0 6 (GPIO_ACTIVE_HIGH)>;
+		grant-gpios =   <&gpio0 7 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
+	};
+};
