@@ -27,6 +27,7 @@
 #elif defined(CONFIG_SOC_NRF5340_CPUNET)
 #include <hal/nrf_nvmc.h>
 #endif
+#include <hal/nrf_rtc.h>
 #include <soc_secure.h>
 
 #define PIN_XL1 0
@@ -131,6 +132,24 @@ bool z_arm_on_enter_cpu_idle(void)
 	} else if (!suppress_message) {
 		LOG_DBG("Anomaly 160 trigger conditions detected.");
 		suppress_message = true;
+	}
+#endif
+#if CONFIG_SOC_NRF53_ANOMALY_165
+	if (ok_to_sleep) {
+		if (!nrf_rtc_event_check(NRF_RTC0, RTC_CHANNEL_EVENT_ADDR(3)) &&
+		    !nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(1)) &&
+		    !nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(2))) {
+			NRF_WDT->TASKS_STOP = 1;
+			/* Check if any event did not occur after we checked for
+			 * stopping condition. If yes, we might have stopped WDT
+			 * when it should be running. Restart it.
+			 */
+			if (nrf_rtc_event_check(NRF_RTC0, RTC_CHANNEL_EVENT_ADDR(3)) ||
+			    nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(1)) ||
+			    nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(2))) {
+				NRF_WDT->TASKS_START = 1;
+			}
+		}
 	}
 #endif
 
