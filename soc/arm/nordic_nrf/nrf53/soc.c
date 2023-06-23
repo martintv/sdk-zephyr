@@ -133,6 +133,11 @@ bool z_arm_on_enter_cpu_idle(void)
 		suppress_message = true;
 	}
 #endif
+	if (ok_to_sleep) {
+		if (IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165)) {
+			NRF_WDT->TASKS_STOP = 1;
+		}
+	}
 
 	return ok_to_sleep;
 }

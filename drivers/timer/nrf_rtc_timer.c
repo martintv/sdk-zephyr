@@ -13,6 +13,8 @@
 #include <drivers/timer/nrf_rtc_timer.h>
 #include <sys_clock.h>
 #include <hal/nrf_rtc.h>
+#include <hal/nrf_wdt.h>
+#include <helpers/nrfx_gppi.h>
 
 #define EXT_CHAN_COUNT CONFIG_NRF_RTC_TIMER_USER_CHAN_COUNT
 #define CHAN_COUNT (EXT_CHAN_COUNT + 1)
@@ -22,6 +24,14 @@
 #define RTC_LABEL rtc1
 #define RTC_CH_COUNT RTC1_CC_NUM
 
+/* Channels used for Errata 165 workaroud */
+#define ANOMALY_165_CC_CHAN 1
+#define ANOMALY_165_OVERFLOW_CHAN 2
+
+BUILD_ASSERT(!IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165) ||
+	     (IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165) &&
+	     (CONFIG_NRF_RTC_TIMER_USER_CHAN_COUNT == 0)),
+		"Cannot use user channels when errata 165 workaround is applied");
 BUILD_ASSERT(CHAN_COUNT <= RTC_CH_COUNT, "Not enough compare channels");
 
 #define COUNTER_BIT_WIDTH 24U
@@ -243,7 +253,7 @@ static void set_alarm(int32_t chan, uint32_t req_cc)
 	 * This never happens when the written value is N+3. Use 3 cycles as
 	 * the nearest possible scheduling then.
 	 */
-	enum { MIN_CYCLES_FROM_NOW = 3 };
+	enum { MIN_CYCLES_FROM_NOW = IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165) ? 4 : 3 };
 	uint32_t cc_val = req_cc;
 	uint32_t cc_inc = MIN_CYCLES_FROM_NOW;
 
@@ -260,6 +270,9 @@ static void set_alarm(int32_t chan, uint32_t req_cc)
 	for (;;) {
 		uint32_t now;
 
+		if (IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165)) {
+			set_comparator(ANOMALY_165_CC_CHAN, cc_val - 1);
+		}
 		set_comparator(chan, cc_val);
 		/* Enable event routing after the required CC value was set.
 		 * Even though the above operation may get repeated (see below),
@@ -708,6 +721,43 @@ static int sys_clock_driver_init(const struct device *dev)
 
 	uint32_t initial_timeout = IS_ENABLED(CONFIG_TICKLESS_KERNEL) ?
 		MAX_CYCLES : CYC_PER_TICK;
+
+#if CONFIG_SOC_NRF53_ANOMALY_165
+	/* PPI channel used when Anomaly 165 is applied and dynamic PPI channel is used. */
+	static uint8_t anomaly_165_ppi_ch;
+
+	/* Configure Watchdog to allow stopping. */
+	nrf_wdt_behaviour_set(NRF_WDT, WDT_CONFIG_STOPEN_Msk | BIT(4));
+	*((volatile uint32_t *)0x41203120) = 0x14;
+
+	/* Allocate PPI channel for RTC Compare event publishers that starts WDT. */
+	nrfx_err_t err = nrfx_gppi_channel_alloc(&anomaly_165_ppi_ch);
+	if (err != NRFX_SUCCESS) {
+		return -ENOMEM;
+	}
+	nrfx_gppi_channels_enable(BIT(anomaly_165_ppi_ch));
+
+	nrfx_gppi_task_endpoint_setup(anomaly_165_ppi_ch,
+			nrf_wdt_task_address_get(NRF_WDT, NRF_WDT_TASK_START));
+
+	uint32_t mpsl_cc = nrf_rtc_event_address_get(NRF_RTC0, NRF_RTC_EVENT_COMPARE_3);
+	uint32_t evt_cc = nrf_rtc_event_address_get(RTC,
+				RTC_CHANNEL_EVENT_ADDR(ANOMALY_165_CC_CHAN));
+	uint32_t evt_overflow = nrf_rtc_event_address_get(RTC,
+				RTC_CHANNEL_EVENT_ADDR(ANOMALY_165_OVERFLOW_CHAN));
+
+	if (IS_ENABLED(CONFIG_BT_LL_SOFTDEVICE)) {
+		nrfx_gppi_event_endpoint_setup(anomaly_165_ppi_ch, mpsl_cc);
+	}
+	nrfx_gppi_event_endpoint_setup(anomaly_165_ppi_ch, evt_cc);
+	nrfx_gppi_event_endpoint_setup(anomaly_165_ppi_ch, evt_overflow);
+
+	event_enable(ANOMALY_165_CC_CHAN);
+	event_enable(ANOMALY_165_OVERFLOW_CHAN);
+
+	/* Set event 1 tick before overflow. */
+	set_comparator(ANOMALY_165_OVERFLOW_CHAN, COUNTER_SPAN - 1);
+#endif
 
 	compare_set(0, initial_timeout, sys_clock_timeout_handler, NULL);
 
