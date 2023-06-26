@@ -19,6 +19,9 @@
 #include <logging/log.h>
 #include <nrf_erratas.h>
 #include <hal/nrf_power.h>
+#include "/home/martintv/repos/sdk-nrf/pin_debug_transport.h"
+#include <hal/nrf_rtc.h>
+
 #if defined(CONFIG_SOC_NRF5340_CPUAPP)
 #include <hal/nrf_cache.h>
 #include <hal/nrf_gpio.h>
@@ -118,9 +121,12 @@ static bool nrf53_anomaly_160_check(void)
 
 	return true;
 }
+#define ANOMALY_165_CC_CHAN 1
+#define ANOMALY_165_OVERFLOW_CHAN 2
 
 bool z_arm_on_enter_cpu_idle(void)
 {
+	DBP_TOGGLE(13)
 	bool ok_to_sleep = nrf53_anomaly_160_check();
 
 #if (LOG_LEVEL >= LOG_LEVEL_DBG)
@@ -135,10 +141,18 @@ bool z_arm_on_enter_cpu_idle(void)
 #endif
 	if (ok_to_sleep) {
 		if (IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165)) {
-			NRF_WDT->TASKS_STOP = 1;
+			if ( !nrf_rtc_event_check(NRF_RTC0, RTC_CHANNEL_EVENT_ADDR(3)) &&
+			     !nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(ANOMALY_165_OVERFLOW_CHAN)) &&
+				 !nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(ANOMALY_165_CC_CHAN))) {
+				NRF_WDT->TASKS_STOP = 1;
+				DBP_TOGGLE(14);
+			}
+			else
+			{
+				DBP_TOGGLE(15);
+			}
 		}
 	}
-
 	return ok_to_sleep;
 }
 #endif /* CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND */

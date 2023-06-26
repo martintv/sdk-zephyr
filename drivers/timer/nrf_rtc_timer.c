@@ -15,6 +15,8 @@
 #include <hal/nrf_rtc.h>
 #include <hal/nrf_wdt.h>
 #include <helpers/nrfx_gppi.h>
+#include "/home/martintv/repos/sdk-nrf/pin_debug_transport.h"
+
 
 #define EXT_CHAN_COUNT CONFIG_NRF_RTC_TIMER_USER_CHAN_COUNT
 #define CHAN_COUNT (EXT_CHAN_COUNT + 1)
@@ -532,9 +534,15 @@ static void process_channel(int32_t chan)
 void rtc_nrf_isr(const void *arg)
 {
 	ARG_UNUSED(arg);
-
+	DBP_ON(9);
+	if (NRF_WDT_NS->RUNSTATUS == 0)
+    {
+      DBP_TOGGLE(12);
+    }
+	event_clear(ANOMALY_165_CC_CHAN);
 	if (nrf_rtc_int_enable_check(RTC, NRF_RTC_INT_OVERFLOW_MASK) &&
 	    nrf_rtc_event_check(RTC, NRF_RTC_EVENT_OVERFLOW)) {
+		event_clear(ANOMALY_165_OVERFLOW_CHAN);
 		nrf_rtc_event_clear(RTC, NRF_RTC_EVENT_OVERFLOW);
 		overflow_cnt++;
 	}
@@ -542,6 +550,7 @@ void rtc_nrf_isr(const void *arg)
 	for (int32_t chan = 0; chan < CHAN_COUNT; chan++) {
 		process_channel(chan);
 	}
+	DBP_OFF(9);
 }
 
 int32_t z_nrf_rtc_timer_chan_alloc(void)
