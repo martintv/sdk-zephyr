@@ -120,6 +120,8 @@ static bool nrf53_anomaly_160_check(void)
 	return true;
 }
 
+extern uint8_t anomaly_165_ppi_ch;
+
 bool z_arm_on_enter_cpu_idle(void)
 {
 	bool ok_to_sleep = nrf53_anomaly_160_check();
@@ -136,6 +138,7 @@ bool z_arm_on_enter_cpu_idle(void)
 #endif
 #if CONFIG_SOC_NRF53_ANOMALY_165
 	if (ok_to_sleep) {
+		NRF_IPC_NS->PUBLISH_RECEIVE[1]= 1<<31 | anomaly_165_ppi_ch;
 		if (!nrf_rtc_event_check(NRF_RTC0, RTC_CHANNEL_EVENT_ADDR(3)) &&
 		    !nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(1)) &&
 		    !nrf_rtc_event_check(NRF_RTC1, RTC_CHANNEL_EVENT_ADDR(2))) {

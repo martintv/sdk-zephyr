@@ -63,6 +63,8 @@ static struct z_nrf_rtc_timer_chan_data cc_data[CHAN_COUNT];
 static atomic_t int_mask;
 static atomic_t alloc_mask;
 static atomic_t force_isr_mask;
+/* PPI channel used when Anomaly 165 is applied and dynamic PPI channel is used. */
+uint8_t anomaly_165_ppi_ch;
 
 static uint32_t counter_sub(uint32_t a, uint32_t b)
 {
@@ -536,6 +538,7 @@ void rtc_nrf_isr(const void *arg)
 {
 	ARG_UNUSED(arg);
 
+	NRF_IPC_NS->PUBLISH_RECEIVE[1]= 0;
 	if (nrf_rtc_int_enable_check(RTC, NRF_RTC_INT_OVERFLOW_MASK) &&
 	    nrf_rtc_event_check(RTC, NRF_RTC_EVENT_OVERFLOW)) {
 		if (IS_ENABLED(CONFIG_SOC_NRF53_ANOMALY_165)) {
@@ -729,9 +732,6 @@ static int sys_clock_driver_init(const struct device *dev)
 		MAX_CYCLES : CYC_PER_TICK;
 
 #if CONFIG_SOC_NRF53_ANOMALY_165
-	/* PPI channel used when Anomaly 165 is applied and dynamic PPI channel is used. */
-	static uint8_t anomaly_165_ppi_ch;
-
 	/* Configure Watchdog to allow stopping. */
 	nrf_wdt_behaviour_set(NRF_WDT, WDT_CONFIG_STOPEN_Msk | BIT(4));
 	*((volatile uint32_t *)0x41203120) = 0x14;
@@ -742,8 +742,7 @@ static int sys_clock_driver_init(const struct device *dev)
 		return -ENOMEM;
 	}
 	nrfx_gppi_channels_enable(BIT(anomaly_165_ppi_ch));
-	nrfx_gppi_channels_enable(BIT(29));
-	nrfx_gppi_task_endpoint_setup(29,
+	nrfx_gppi_task_endpoint_setup(anomaly_165_ppi_ch,
 			nrf_wdt_task_address_get(NRF_WDT, NRF_WDT_TASK_START));
 
 	uint32_t mpsl_cc = nrf_rtc_event_address_get(NRF_RTC0, NRF_RTC_EVENT_COMPARE_3);
@@ -760,7 +759,7 @@ static int sys_clock_driver_init(const struct device *dev)
 	NRF_IPC_NS->SUBSCRIBE_SEND[0]= 1<<31 | anomaly_165_ppi_ch;
 	NRF_IPC_NS->SEND_CNF[0] = 1;
 
-	NRF_IPC_NS->PUBLISH_RECEIVE[1]= 1<<31 | 29;
+	NRF_IPC_NS->PUBLISH_RECEIVE[1]= 1<<31 | anomaly_165_ppi_ch;
 	NRF_IPC_NS->RECEIVE_CNF[1] = 2;
 
 	event_enable(ANOMALY_165_CC_CHAN);
