@@ -742,8 +742,8 @@ static int sys_clock_driver_init(const struct device *dev)
 		return -ENOMEM;
 	}
 	nrfx_gppi_channels_enable(BIT(anomaly_165_ppi_ch));
-
-	nrfx_gppi_task_endpoint_setup(anomaly_165_ppi_ch,
+	nrfx_gppi_channels_enable(BIT(29));
+	nrfx_gppi_task_endpoint_setup(29,
 			nrf_wdt_task_address_get(NRF_WDT, NRF_WDT_TASK_START));
 
 	uint32_t mpsl_cc = nrf_rtc_event_address_get(NRF_RTC0, NRF_RTC_EVENT_COMPARE_3);
@@ -757,6 +757,11 @@ static int sys_clock_driver_init(const struct device *dev)
 	}
 	nrfx_gppi_event_endpoint_setup(anomaly_165_ppi_ch, evt_cc);
 	nrfx_gppi_event_endpoint_setup(anomaly_165_ppi_ch, evt_overflow);
+	NRF_IPC_NS->SUBSCRIBE_SEND[0]= 1<<31 | anomaly_165_ppi_ch;
+	NRF_IPC_NS->SEND_CNF[0] = 1;
+
+	NRF_IPC_NS->PUBLISH_RECEIVE[1]= 1<<31 | 29;
+	NRF_IPC_NS->RECEIVE_CNF[1] = 2;
 
 	event_enable(ANOMALY_165_CC_CHAN);
 	event_enable(ANOMALY_165_OVERFLOW_CHAN);
