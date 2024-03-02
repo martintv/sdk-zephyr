@@ -855,7 +855,9 @@ static void att_req_send_process(struct bt_att *att)
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&att->chans, chan, tmp, node) {
 		/* If there is an ongoing transaction, do not use the channel */
+		k_sched_lock();
 		if (chan->req) {
+			k_sched_unlock();
 			continue;
 		}
 
@@ -864,6 +866,7 @@ static void att_req_send_process(struct bt_att *att)
 			 * channel has the same "enhancedness", there will be nothing to send for
 			 * this channel either.
 			 */
+			k_sched_unlock();
 			continue;
 		}
 
@@ -872,13 +875,15 @@ static void att_req_send_process(struct bt_att *att)
 		/* Pull next request from the list */
 		req = get_first_req_matching_chan(&att->reqs, chan);
 		if (!req) {
+			k_sched_unlock();
 			continue;
 		}
 
 		if (bt_att_chan_req_send(chan, req) >= 0) {
+			k_sched_unlock();
 			return;
 		}
-
+		k_sched_unlock();
 		/* Prepend back to the list as it could not be sent */
 		sys_slist_prepend(&att->reqs, &req->node);
 	}
