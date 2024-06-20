@@ -151,6 +151,7 @@ static void commit_changes(off_t addr, size_t len)
 }
 #endif
 
+static uint32_t erasevalue=0x55;
 static void rram_write(off_t addr, const void *data, size_t len)
 {
 #if !defined(CONFIG_TRUSTED_EXECUTION_NONSECURE)
@@ -162,7 +163,7 @@ static void rram_write(off_t addr, const void *data, size_t len)
 	if (data) {
 		memcpy((void *)addr, data, len);
 	} else {
-		memset((void *)addr, ERASE_VALUE, len);
+		memset((void *)addr, erasevalue, len);
 	}
 
 	barrier_dmem_fence_full(); /* Barrier following our last write. */
@@ -218,7 +219,13 @@ static int write_op(void *context)
 			}
 		}
 	}
-
+	if (erasevalue == 0x55)
+	{
+		erasevalue = 0xFF;
+	} else
+	{
+		erasevalue = 0x55;
+	}
 	return FLASH_OP_DONE;
 }
 
