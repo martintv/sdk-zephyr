@@ -163,6 +163,7 @@ static ssize_t write_appearance(struct bt_conn *conn, const struct bt_gatt_attr 
 	err = bt_set_appearance(appearance);
 
 	if (err) {
+		LOG_ERR("matv1");
 		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
 	}
 
@@ -2160,6 +2161,7 @@ ssize_t bt_gatt_attr_write_ccc(struct bt_conn *conn,
 
 		/* Accept size=1 for backwards compatibility */
 		if (write != sizeof(value) && write != 1) {
+			LOG_ERR("matv2");
 			return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
 		}
 	}
@@ -4588,6 +4590,7 @@ static void parse_read_by_uuid(struct bt_conn *conn,
 
 	/* Continue reading the attributes */
 	if (bt_gatt_read(conn, params) < 0) {
+		LOG_ERR("matv3");
 		params->func(conn, BT_ATT_ERR_UNLIKELY, params, NULL, 0);
 	}
 }
@@ -4631,6 +4634,7 @@ static void gatt_read_rsp(struct bt_conn *conn, uint8_t err, const void *pdu,
 
 	/* Continue reading the attribute */
 	if (bt_gatt_read(conn, params) < 0) {
+		LOG_ERR("matv4");
 		params->func(conn, BT_ATT_ERR_UNLIKELY, params, NULL, 0);
 	}
 }
@@ -5020,6 +5024,7 @@ static void gatt_prepare_write_rsp(struct bt_conn *conn, uint8_t err,
 
 fail:
 	/* Notify application that the write operation has failed */
+	LOG_ERR("matv5");
 	params->func(conn, BT_ATT_ERR_UNLIKELY, params);
 }
 
@@ -5414,6 +5419,7 @@ void bt_gatt_cancel(struct bt_conn *conn, void *params)
 	k_sched_unlock();
 
 	if (func) {
+		LOG_ERR("matv6");
 		func(conn, BT_ATT_ERR_UNLIKELY, NULL, 0, params);
 	}
 }

@@ -800,6 +800,7 @@ static uint8_t att_mtu_req(struct bt_att_chan *chan, struct net_buf *buf)
 
 	pdu = bt_att_create_rsp_pdu(chan, BT_ATT_OP_MTU_RSP, sizeof(*rsp));
 	if (!pdu) {
+		LOG_ERR("matv7");
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
@@ -1278,7 +1279,7 @@ static uint8_t err_to_att(int err)
 	if (err < 0 && err >= -0xff) {
 		return -err;
 	}
-
+	LOG_ERR("matv8");
 	return BT_ATT_ERR_UNLIKELY;
 }
 
@@ -1507,6 +1508,7 @@ static uint8_t att_read_type_req(struct bt_att_chan *chan, struct net_buf *buf)
 	start_handle = sys_le16_to_cpu(req->start_handle);
 	end_handle = sys_le16_to_cpu(req->end_handle);
 	if (!bt_uuid_create(&u.uuid, req->uuid, uuid_len)) {
+		LOG_ERR("matv9");
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
@@ -1938,6 +1940,7 @@ static uint8_t att_read_group_req(struct bt_att_chan *chan, struct net_buf *buf)
 	end_handle = sys_le16_to_cpu(req->end_handle);
 
 	if (!bt_uuid_create(&u.uuid, req->uuid, uuid_len)) {
+		LOG_ERR("matv10");
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
@@ -2354,6 +2357,7 @@ static uint8_t att_exec_write_rsp(struct bt_att_chan *chan, uint8_t flags)
 	/* Generate response */
 	buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_EXEC_WRITE_RSP, 0);
 	if (!buf) {
+		LOG_ERR("matv11");
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
@@ -2515,6 +2519,7 @@ static uint8_t att_error_rsp(struct bt_att_chan *chan, struct net_buf *buf)
 	 */
 	if (!chan->req || chan->req == &cancel || !rsp->error) {
 		err = BT_ATT_ERR_UNLIKELY;
+		LOG_ERR("matv12");
 		goto done;
 	}
 
@@ -3074,6 +3079,7 @@ static void att_reset(struct bt_att *att)
 		node = sys_slist_get_not_empty(&att->reqs);
 		req = CONTAINER_OF(node, struct bt_att_req, node);
 		if (req->func) {
+			LOG_ERR("matv12");
 			req->func(att->conn, BT_ATT_ERR_UNLIKELY, NULL, 0,
 				  req->user_data);
 		}
@@ -3104,6 +3110,7 @@ static void att_chan_detach(struct bt_att_chan *chan)
 
 	if (chan->req) {
 		/* Notify outstanding request */
+		LOG_ERR("matv13");
 		att_handle_rsp(chan, NULL, 0, BT_ATT_ERR_UNLIKELY);
 	}
 
@@ -3213,12 +3220,14 @@ static uint8_t att_req_retry(struct bt_att_chan *att_chan)
 
 	buf = bt_att_chan_create_pdu(att_chan, req->att_op, req->len);
 	if (!buf) {
+				LOG_ERR("matv14");
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
 	if (req->encode(buf, req->len, req->user_data)) {
 		tx_meta_data_free(bt_att_tx_meta_data(buf));
 		net_buf_unref(buf);
+		LOG_ERR("matv15");
 		return BT_ATT_ERR_UNLIKELY;
 	}
 
