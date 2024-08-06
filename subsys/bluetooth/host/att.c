@@ -3079,7 +3079,7 @@ static void att_reset(struct bt_att *att)
 		node = sys_slist_get_not_empty(&att->reqs);
 		req = CONTAINER_OF(node, struct bt_att_req, node);
 		if (req->func) {
-			LOG_ERR("matv12");
+			LOG_ERR("matv17");
 			req->func(att->conn, BT_ATT_ERR_UNLIKELY, NULL, 0,
 				  req->user_data);
 		}
